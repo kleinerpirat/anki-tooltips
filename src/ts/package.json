@@ -1,0 +1,45 @@
+{
+    "name": "anki-tooltips",
+    "version": "2.0.0",
+    "private": true,
+    "author": "Matthias Metelka <kleinerpirat@github.com>",
+    "license": "AGPL-3.0-or-later",
+    "scripts": {
+        "build": "cross-env NODE_ENV=production node esbuild.config.js",
+        "dev": "cross-env NODE_ENV=development node esbuild.config.js",
+        "svelte-check": "svelte-check --workspace . --ignore \"anki\" --threshold warning --fail-on-warnings",
+        "eslint": "eslint --ext ts -c .eslintrc.js src",
+        "prettier": "prettier --write *.{js,json} .prettierrc .eslintrc.js src",
+        "lint": "npm-run-all svelte-check eslint prettier"
+    },
+    "devDependencies": {
+        "@tsconfig/svelte": "^2.0.1",
+        "@typescript-eslint/eslint-plugin": "^5.10.1",
+        "@typescript-eslint/parser": "^5.10.1",
+        "cross-env": "^7.0.3",
+        "esbuild": "^0.14.29",
+        "esbuild-sass-plugin": "^2.2.1",
+        "esbuild-svelte": "^0.5.6",
+        "eslint": "^8.7.0",
+        "eslint-plugin-compat": "^4.0.1",
+        "prettier": "^2.4.1",
+        "prettier-plugin-svelte": "^2.4.0",
+        "sass": "^1.49.0",
+        "svelte": "^3.43.2",
+        "svelte-check": "^2.2.7",
+        "svelte-preprocess": "^4.9.8",
+        "typescript": "^4.4.4"
+    },
+    "browserslist": [
+        "defaults",
+        "not IE 11",
+        "not op_mini all",
+        "Chrome 77",
+        "iOS 12"
+    ],
+    "dependencies": {
+        "@mdi/svg": "^7.1.96",
+        "@popperjs/core": "^2.11.4",
+        "tippy.js": "^6.3.7"
+    }
+}

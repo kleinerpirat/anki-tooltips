@@ -1,0 +1,47 @@
+// Anki Tooltips
+// Copyright (C) 2023 Matthias Metelka
+// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+
+@use "tippy.js/animations/scale.css";
+@use "tippy.js/dist/tippy.css";
+
+$background-color: var(--canvas, var(--window-bg));
+$border-color: var(--border-subtle, var(--medium-border));
+$border-radius: var(--border-radius-medium, 12px);
+
+.tippy-box {
+    position: relative;
+    img {
+        max-width: 100%;
+    }
+}
+
+.tippy-box[data-theme~="input"] {
+    background-color: $background-color;
+    box-shadow: 0 8px 10px -5px #14141433, 0 12px 20px 2px #14141424,
+        0 5px 24px 4px #1414141f;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    padding: 0;
+}
+
+.tippy-box[data-theme~="input"] .tippy-content {
+    padding: 5px;
+}
+
+.tippy-box[data-theme~="input"][data-placement^="top"] > .tippy-arrow::before {
+    border-top-color: $background-color;
+    filter: drop-shadow(0 1px 0 $border-color);
+}
+.tippy-box[data-theme~="input"][data-placement^="bottom"] > .tippy-arrow::before {
+    border-bottom-color: $background-color;
+    filter: drop-shadow(0 -1px 0 $border-color);
+}
+.tippy-box[data-theme~="input"][data-placement^="left"] > .tippy-arrow::before {
+    border-left-color: $background-color;
+    filter: drop-shadow(1px 0 0 $border-color);
+}
+.tippy-box[data-theme~="input"][data-placement^="right"] > .tippy-arrow::before {
+    border-right-color: $background-color;
+    filter: drop-shadow(-1px 0 0 $border-color);
+}

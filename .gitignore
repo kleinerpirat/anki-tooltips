@@ -1,0 +1,20 @@
+# VSCode
+.vscode
+
+# General
+.DS_Store
+dist
+zipped
+
+# Anki
+anki
+meta.json
+*.ankiaddon
+
+# Python
+__pycache__
+*.pyc
+
+# NPM / Typescript 
+node_modules
+yarn-error.log
