@@ -8,10 +8,27 @@ from bs4 import BeautifulSoup
 import warnings
 
 from aqt.editor import Editor
-from aqt.gui_hooks import editor_will_munge_html
+from aqt.gui_hooks import editor_did_init, editor_will_munge_html
+from ..config import tooltip_shortcut
 
 # BeautifulSoup occasionally throws errors, e.g. when the content looks like a filename
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
+
+
+def suppress() -> None:
+    pass
+
+
+def on_editor_did_init(editor: Editor) -> str:
+    """
+    Override default editor shortcut
+    """
+
+    QShortcut(  # type: ignore
+        QKeySequence(tooltip_shortcut.value),
+        self.widget,
+        activated=suppress,
+    )
 
 
 def on_editor_will_munge_html(txt: str, editor: Editor) -> str:
@@ -33,4 +50,5 @@ def on_editor_will_munge_html(txt: str, editor: Editor) -> str:
 
 
 def init_editor() -> None:
+    editor_did_init.append(on_editor_did_init)
     editor_will_munge_html.append(on_editor_will_munge_html)
