@@ -7,7 +7,6 @@ dist
 zipped
 
 # Anki
-anki
 meta.json
 *.ankiaddon
 
