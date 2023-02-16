@@ -4,6 +4,7 @@
 
 from aqt import mw
 
+from anki.utils import point_version
 from aqt.gui_hooks import webview_will_set_content
 from aqt.editor import Editor
 from aqt.webview import WebContent
@@ -25,9 +26,14 @@ def on_webview_will_set_content(web_content: WebContent, context: Any):
         web_content.js.append(f"{base_path}/index.js")
         web_content.css.append(f"{base_path}/index.css")
 
-        web_content.head += f"""<script>globalThis.tooltipShortcut = "{
-            tooltip_shortcut.value.replace("Ctrl", "Control")
-        }";</script>"""
+        # Make some variables globally available
+        web_content.head += f"""
+<script>
+    globalThis.tooltipShortcut = "{
+        tooltip_shortcut.value.replace("Ctrl", "Control")
+    }";
+    globalThis.pointVersion = {point_version()};
+</script>"""
 
 
 def init_webview():
