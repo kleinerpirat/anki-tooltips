@@ -56,7 +56,7 @@ function placeCaret(node: Node, range: Range): void {
     selection.addRange(range);
 }
 
-export function placeCaretAfter(node: Node): void {
+function placeCaretAfter(node: Node): void {
     const range = new Range();
     range.setStartAfter(node);
     range.collapse(true);
@@ -71,6 +71,28 @@ export function moveCaretToEnd(el: HTMLElement) {
     const selection = el.getRootNode().getSelection()!;
     selection.removeAllRanges();
     selection.addRange(range);
+}
+
+/**
+ * Tries to restore the caret to an intuitive position
+ * after the TooltipEditor is closed.
+ * 
+ * @param editable - `<anki-editable>`
+ * @param previousSibling - previousElementSibling of the original anchor
+ */
+export function restoreCaretPosition(
+    editable: HTMLElement,
+    previousSibling: Element | null,
+) {
+    const editedAnchor = editable.querySelector("a[data-tippy-content].edited");
+    if (editedAnchor) {
+        placeCaretAfter(editedAnchor);
+        editedAnchor.removeAttribute("class");
+    } else if (previousSibling) {
+        placeCaretAfter(previousSibling);
+    } else {
+        editable.focus();
+    }
 }
 
 export function encodeAttribute(html: string) {
@@ -106,7 +128,7 @@ export function createTooltipAnchor(content = ""): HTMLAnchorElement {
 
 /**
  * If the caret is inside a word, surround it with a tooltip anchor.
- * 
+ *
  * Should only be called when the selection is empty.
  *
  * @param selection The Selection object to scan
@@ -149,4 +171,33 @@ export function wrapWordFromSelection(selection: Selection): boolean {
 
 function isWordChar(char: string) {
     return /\w/.test(char);
+}
+
+/**
+ * Insert style link into the shadowRoot of a given field
+ *
+ * @pararm customStyles - component of RichTextInputAPI since 2.1.55
+ * @praram editable - <anki-editable> element
+ * @param {str} path - path to the CSS file
+ * @param {str} id - id of the style link
+ */
+export async function insertStyles(
+    customStyles,
+    editable,
+    path: string,
+    id: string,
+): Promise<void> {
+    if (!customStyles) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.id = id;
+        link.href = path;
+        editable.getRootNode().insertBefore(link, editable);
+    }
+    /**
+     * Best practice since 2.1.54
+     * @see {@link https://github.com/ankitects/anki/pull/1918}
+     */
+    const { addStyleLink } = await customStyles;
+    addStyleLink(id, path);
 }

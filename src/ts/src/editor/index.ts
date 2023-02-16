@@ -3,15 +3,21 @@
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import "./styles/field.scss";
+import { get } from "svelte/store";
 
 // Our Svelte components
 import TooltipButton from "./components/TooltipButton.svelte";
 import TooltipAnchor from "./components/TooltipAnchor.svelte";
 
-import { decodeAttribute, addonPackageFromScript, placeCaretAfter } from "./utils";
+import {
+    decodeAttribute,
+    addonPackageFromScript,
+    insertStyles,
+    restoreCaretPosition,
+} from "./utils";
 
 /**
- * The following imports may seem like regular static ESM imports, but they're not.
+ * The following import may seem like regular static ESM import, but it's not.
  *
  * @example
  * ```ts
@@ -32,30 +38,34 @@ import { decodeAttribute, addonPackageFromScript, placeCaretAfter } from "./util
  */
 // @ts-ignore
 import * as NoteEditor from "anki/NoteEditor";
-// @ts-ignore
-import * as RichTextInput from "anki/RichTextInput";
-
 /**
  * "@anki" is an alias for the Anki submodule ("../../../../anki/ts/*").
  * It should only be used for types - other imports are likely to fail.
  */
 import type { NoteEditorAPI } from "@anki/editor/NoteEditor.svelte";
+import type { EditorFieldAPI } from "@anki/editor/EditorField.svelte";
 import type { RichTextInputAPI } from "@anki/editor/rich-text-input";
+import type { PlainTextInputAPI } from "@anki/editor/plain-text-input";
 
 const addonPackage = addonPackageFromScript(
     document.currentScript as HTMLScriptElement,
 );
 
 /**
- * Surrounding logic got reworked for 2.1.55, so we need
- * to handle versions below that separately.
- *
- * pointVersion {int} - Anki minor version exposed in qt/webview.py
+ * Anki minor version exposed in qt/webview.py
+ * On lower versions it might not be initialized at the time of this assignment.
  */
-const surrounder =
-    globalThis.pointVersion <= 54
-        ? require("anki/surround").Surrounder.make()
-        : require("anki/RichTextInput").surrounder;
+const pointVersion: number | undefined = globalThis.pointVersion;
+const legacy = pointVersion == undefined || pointVersion <= 54;
+
+/**
+ * Surrounding logic got reworked for 2.1.55, so this is either the
+ * surrounder from RichTextInput (2.1.55+)
+ * or a newly created Surrounder instance.
+ */
+const surrounder = legacy
+    ? require("anki/surround").Surrounder.make()
+    : require("anki/RichTextInput").surrounder;
 
 NoteEditor.lifecycle.onMount(({ toolbar }: NoteEditorAPI): void => {
     toolbar.templateButtons.append({
@@ -73,21 +83,47 @@ NoteEditor.lifecycle.onMount(({ toolbar }: NoteEditorAPI): void => {
  * @see {@link https://github.com/ankitects/anki/blob/main/ts/editor/rich-text-input/RichTextInput.svelte}
  * for all available API properties.
  */
-RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
+if (pointVersion && pointVersion >= 54) {
+    // richTextInput got exposed in 2.1.54
+    require("anki/RichTextInput").lifecycle.onMount(setupRichTextInput);
+} else {
+    /**
+     * Workaround for older Anki versions.
+     * Unfortunately the inputs are not yet mounted when
+     * NoteEditor.lifecycle.onMount fires, so we need that while loop.
+     */
+    NoteEditor.lifecycle.onMount(async (noteEditor: NoteEditorAPI) => {
+        while (!noteEditor.fields?.length) {
+            await new Promise(requestAnimationFrame);
+        }
+        noteEditor.fields.forEach((field: EditorFieldAPI) => {
+            const inputs = get(field.editingArea.editingInputs) as [
+                RichTextInputAPI,
+                PlainTextInputAPI,
+            ];
+            setupRichTextInput(inputs[0]);
+        });
+    });
+}
+
+/**
+ * Add styles and EventListeners to <anki-editable>
+ */
+async function setupRichTextInput(api: RichTextInputAPI) {
     const { customStyles, element, preventResubscription } = api;
 
-    if (globalThis.pointVersion <= 54 && !surrounder.richText) {
+    if (legacy && !surrounder.richText) {
         surrounder.richText = api;
     }
 
-    /**
-     * Insert CSS into shadowRoot via CustomStyles component
-     * @see {@link https://github.com/ankitects/anki/pull/1918}
-     */
-    const { addStyleLink } = await customStyles;
-    addStyleLink("tooltipStyles", `./${addonPackage}/web/editor/index.css`);
-
     const editable = await element;
+
+    insertStyles(
+        customStyles,
+        editable,
+        `./${addonPackage}/web/editor/index.css`,
+        "tooltipStyles",
+    );
 
     /**
      *  Event delegation to <anki-editable> works, but
@@ -111,14 +147,12 @@ RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
     /**
      * @deprecated Required for versions below 2.1.55
      */
-    if (globalThis.pointVersion <= 54) {
+    if (legacy) {
         editable.addEventListener("focusin", () => {
             surrounder.richText = api;
-            globalThis.tooltipSurrounderDisabled = false;
         });
         editable.addEventListener("focusout", () => {
             surrounder.disable();
-            globalThis.tooltipSurrounderDisabled = true;
         });
     }
 
@@ -135,14 +169,14 @@ RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
             return;
         }
 
-        const anchor = e.target;
-        const previousSibling = anchor.previousElementSibling;
-
         /**
          * Function returned from preventResubscription to enable resubscription again.
          * @see {@link https://forums.ankiweb.net/t/tip-dynamic-html-js-inside-anki-editable/}
          */
         const callback = preventResubscription();
+
+        const anchor = e.target;
+        const previousSibling = anchor.previousElementSibling;
 
         const svelteAnchor = new TooltipAnchor({
             target: anchor.parentElement ?? editable,
@@ -154,6 +188,8 @@ RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
             },
         });
 
+        anchor.remove();
+
         /**
          * Svelte components can't directly self-destruct, so we listen
          * for a message from TooltipAnchor to destroy it from outside.
@@ -163,22 +199,8 @@ RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
             setTimeout(() => {
                 // Reenable resubscription
                 callback();
-
-                // Restore caret position
-                const editedAnchor = editable.querySelector(
-                    "a[data-tippy-content].edited",
-                );
-                if (editedAnchor) {
-                    placeCaretAfter(editedAnchor);
-                    editedAnchor.removeAttribute("class");
-                } else if (previousSibling) {
-                    placeCaretAfter(previousSibling);
-                } else {
-                    editable.focus();
-                }
+                restoreCaretPosition(editable, previousSibling);
             });
         });
-
-        anchor.remove();
     }
-});
+}

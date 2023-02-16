@@ -36,6 +36,8 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
     import type { MatchType } from "@anki/domlib/surround";
     import type { FormattingNode } from "@anki/domlib/surround/tree";
     // @ts-ignore
+    import * as NoteEditor from "anki/NoteEditor";
+    // @ts-ignore
     import { getPlatformString } from "anki/shortcuts";
     // copy of original Anki component with runtime imports
     import Shortcut from "./anki-components/Shortcut.svelte";
@@ -101,9 +103,6 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
     };
 
     async function updateStateFromActiveInput(): Promise<boolean> {
-        if (!globalThis.hasOwnProperty("tooltipSurrounderDisabled")) {
-            return false;
-        }
         return disabled
             ? false
             : surrounder.isSurrounded(globalThis.pointVersion <= 54 ? format : key);
@@ -151,14 +150,13 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
         surrounder.surround(globalThis.pointVersion <= 54 ? format : key);
     }
 
+    const { focusedInput } = NoteEditor.context.get();
     /**
-     * @deprecated Whether an `<anki-editable` is focused or not. Set in index.ts.
-     * Required for versions below 2.1.55.
-     *
-     * On 2.1.55+ you can subscribe to Surrounder.active (see below)
+     * @deprecated Check if an `<anki-editable>` is focused or not.
+     * On 2.1.55+ you can subscribe to Surrounder.active (@see onMount)
      */
     $: if (globalThis.pointVersion <= 54) {
-        disabled = globalThis.tooltipSurrounderDisabled;
+        disabled = $focusedInput?.name !== "rich-text";
     }
 
     onMount(() => {
