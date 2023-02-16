@@ -4,6 +4,9 @@
   "author": "Matthias Metelka <kleinerpirat@github.com>",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
-    "esbuild-plugin-compress": "^0.3.0"
+    "esbuild-plugin-compress": "^1.0.1"
+  },
+  "dependencies": {
+    "npm-check-updates": "^16.7.4"
   }
 }
