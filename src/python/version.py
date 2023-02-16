@@ -5,7 +5,7 @@
 versionInfo = [
     2,  # MAJOR
     0,  # MINOR
-    0,  # PATCH
+    1,  # PATCH
 ]
 
 version = ".".join([str(num) for num in versionInfo])
