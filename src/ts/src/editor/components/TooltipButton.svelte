@@ -4,7 +4,7 @@ Copyright (C) 2023 Matthias Metelka
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 @component
-A button with shortcut that registers a format in {surrounder} from "anki/RichTextInput"
+A button with shortcut that uses a Surrounder (class imported from "anki/surround")
 to wrap selected content with `<a>` tags and changes its state depending on the current selection.
 
 Components such as this one can be appended to the editor toolbar the following way:
@@ -27,15 +27,21 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
     import { onMount } from "svelte/internal";
     import { addTooltipIcon, editTooltipIcon, emptyTooltipIcon } from "../assets/icons";
     import { bubbleSymbol } from "../lib";
-    import { createTooltipAnchor, getCurrentSelection, selectionIsEmpty, wrapWordFromSelection } from "../utils";
+    import {
+        createTooltipAnchor,
+        getCurrentSelection,
+        selectionIsEmpty,
+        wrapWordFromSelection,
+    } from "../utils";
     import type { MatchType } from "@anki/domlib/surround";
     import type { FormattingNode } from "@anki/domlib/surround/tree";
-    // @ts-ignore
-    import { surrounder } from "anki/RichTextInput";
     // @ts-ignore
     import { getPlatformString } from "anki/shortcuts";
     // copy of original Anki component with runtime imports
     import Shortcut from "./anki-components/Shortcut.svelte";
+
+    // not typing Surrounder as its available properties differ between Anki versions
+    export let surrounder;
 
     /**
      * @see {@link https://github.com/ankitects/anki/blob/main/ts/editor/base.ts}
@@ -47,6 +53,7 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
 
     const key = "tooltip";
     let disabled: boolean;
+
     let currentAnchor: HTMLAnchorElement;
 
     function isTooltipAnchor(element: HTMLElement | SVGElement) {
@@ -94,7 +101,12 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
     };
 
     async function updateStateFromActiveInput(): Promise<boolean> {
-        return disabled ? false : surrounder.isSurrounded(key);
+        if (!globalThis.hasOwnProperty("tooltipSurrounderDisabled")) {
+            return false;
+        }
+        return disabled
+            ? false
+            : surrounder.isSurrounded(globalThis.pointVersion <= 54 ? format : key);
     }
 
     /**
@@ -136,12 +148,24 @@ require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
         /**
          * @see formatter
          */
-        surrounder.surround(key);
+        surrounder.surround(globalThis.pointVersion <= 54 ? format : key);
+    }
+
+    /**
+     * @deprecated Whether an `<anki-editable` is focused or not. Set in index.ts.
+     * Required for versions below 2.1.55.
+     *
+     * On 2.1.55+ you can subscribe to Surrounder.active (see below)
+     */
+    $: if (globalThis.pointVersion <= 54) {
+        disabled = globalThis.tooltipSurrounderDisabled;
     }
 
     onMount(() => {
-        surrounder.active.subscribe((value) => (disabled = !value));
-        surrounder.registerFormat(key, format);
+        if (globalThis.pointVersion >= 55) {
+            surrounder.active.subscribe((value) => (disabled = !value));
+            surrounder.registerFormat(key, format);
+        }
     });
 </script>
 

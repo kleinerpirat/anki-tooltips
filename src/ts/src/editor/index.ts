@@ -46,11 +46,22 @@ const addonPackage = addonPackageFromScript(
     document.currentScript as HTMLScriptElement,
 );
 
+/**
+ * Surrounding logic got reworked for 2.1.55, so we need
+ * to handle versions below that separately.
+ *
+ * pointVersion {int} - Anki minor version exposed in qt/webview.py
+ */
+const surrounder =
+    globalThis.pointVersion <= 54
+        ? require("anki/surround").Surrounder.make()
+        : require("anki/RichTextInput").surrounder;
+
 NoteEditor.lifecycle.onMount(({ toolbar }: NoteEditorAPI): void => {
     toolbar.templateButtons.append({
         component: TooltipButton,
         // profile-specific shortcut set in qt/webview.py
-        props: { keyCombination: globalThis.tooltipShortcut },
+        props: { surrounder, keyCombination: globalThis.tooltipShortcut },
         id: "tooltipButton",
     });
 });
@@ -62,94 +73,112 @@ NoteEditor.lifecycle.onMount(({ toolbar }: NoteEditorAPI): void => {
  * @see {@link https://github.com/ankitects/anki/blob/main/ts/editor/rich-text-input/RichTextInput.svelte}
  * for all available API properties.
  */
-RichTextInput.lifecycle.onMount(
-    async ({ customStyles, element, preventResubscription }: RichTextInputAPI) => {
-        /**
-         * Insert CSS into shadowRoot via CustomStyles component
-         * @see {@link https://github.com/ankitects/anki/pull/1918}
-         */
-        const { addStyleLink } = await customStyles;
-        addStyleLink("tooltipStyles", `./${addonPackage}/web/editor/index.css`);
+RichTextInput.lifecycle.onMount(async (api: RichTextInputAPI) => {
+    const { customStyles, element, preventResubscription } = api;
 
-        const editable = await element;
+    if (globalThis.pointVersion <= 54 && !surrounder.richText) {
+        surrounder.richText = api;
+    }
 
-        /**
-         *  Event delegation to <anki-editable> works, but
-         *  EventListeners added to elements inside <anki-editable> will not (!)
-         *
-         *  That's because the resubscription process between PlainTextInput and RichTextInput
-         *  sets the innerHTML of <anki-editable>, i.e. destroys all elements and creates new ones.
-         *
-         *  @see {@link https://forums.ankiweb.net/t/tip-dynamic-html-js-inside-anki-editable/}
-         */
-        editable.addEventListener("click", onTrigger);
+    /**
+     * Insert CSS into shadowRoot via CustomStyles component
+     * @see {@link https://github.com/ankitects/anki/pull/1918}
+     */
+    const { addStyleLink } = await customStyles;
+    addStyleLink("tooltipStyles", `./${addonPackage}/web/editor/index.css`);
 
-        /**
-         * Instead of querying the API via require("anki/NoteEditor").instances[0].fields etc. at runtime,
-         * it's best to keep the resubscription logic inside RichTextInput.lifecycle.onMount.
-         *
-         * We do so by attaching an EventListener for a custom event "newTooltip":
-         */
-        editable.addEventListener("newTooltip", onTrigger);
+    const editable = await element;
 
-        /**
-         * Replace "dumb" `<a>` tag with dynamic Svelte component
-         */
-        function onTrigger(e: Event) {
-            if (
-                !e.target ||
-                !(e.target instanceof HTMLAnchorElement) ||
-                !e.target.hasAttribute("data-tippy-content") ||
-                e.target.classList.contains("active")
-            ) {
-                return;
-            }
+    /**
+     *  Event delegation to <anki-editable> works, but
+     *  EventListeners added to elements inside <anki-editable> will not (!)
+     *
+     *  That's because the resubscription process between PlainTextInput and RichTextInput
+     *  sets the innerHTML of <anki-editable>, i.e. destroys all elements and creates new ones.
+     *
+     *  @see {@link https://forums.ankiweb.net/t/tip-dynamic-html-js-inside-anki-editable/}
+     */
+    editable.addEventListener("click", onTrigger);
 
-            const anchor = e.target;
-            const previousSibling = anchor.previousElementSibling;
+    /**
+     * Instead of querying the API via require("anki/NoteEditor").instances[0].fields etc. at runtime,
+     * it's best to keep the resubscription logic inside RichTextInput.lifecycle.onMount.
+     *
+     * We do so by attaching an EventListener for a custom event "newTooltip":
+     */
+    editable.addEventListener("newTooltip", onTrigger);
 
-            /**
-             * Function returned from preventResubscription to enable resubscription again.
-             * @see {@link https://forums.ankiweb.net/t/tip-dynamic-html-js-inside-anki-editable/}
-             */
-            const callback = preventResubscription();
+    /**
+     * @deprecated Required for versions below 2.1.55
+     */
+    if (globalThis.pointVersion <= 54) {
+        editable.addEventListener("focusin", () => {
+            surrounder.richText = api;
+            globalThis.tooltipSurrounderDisabled = false;
+        });
+        editable.addEventListener("focusout", () => {
+            surrounder.disable();
+            globalThis.tooltipSurrounderDisabled = true;
+        });
+    }
 
-            const svelteAnchor = new TooltipAnchor({
-                target: anchor.parentElement ?? editable,
-                anchor,
-                props: {
-                    editable,
-                    anchorContent: anchor.innerHTML,
-                    tooltipContent: decodeAttribute(anchor.dataset.tippyContent!),
-                },
-            });
-
-            /**
-             * Svelte components can't directly self-destruct, so we listen
-             * for a message from TooltipAnchor to destroy it from outside.
-             */
-            svelteAnchor.$on("destroyComponent", () => {
-                svelteAnchor.$destroy();
-                setTimeout(() => {
-                    // Reenable resubscription
-                    callback();
-
-                    // Restore caret position
-                    const editedAnchor = editable.querySelector(
-                        "a[data-tippy-content].edited",
-                    );
-                    if (editedAnchor) {
-                        placeCaretAfter(editedAnchor);
-                        editedAnchor.removeAttribute("class");
-                    } else if (previousSibling) {
-                        placeCaretAfter(previousSibling);
-                    } else {
-                        editable.focus();
-                    }
-                });
-            });
-
-            anchor.remove();
+    /**
+     * Replace "dumb" `<a>` tag with dynamic Svelte component
+     */
+    function onTrigger(e: Event) {
+        if (
+            !e.target ||
+            !(e.target instanceof HTMLAnchorElement) ||
+            !e.target.hasAttribute("data-tippy-content") ||
+            e.target.classList.contains("active")
+        ) {
+            return;
         }
-    },
-);
+
+        const anchor = e.target;
+        const previousSibling = anchor.previousElementSibling;
+
+        /**
+         * Function returned from preventResubscription to enable resubscription again.
+         * @see {@link https://forums.ankiweb.net/t/tip-dynamic-html-js-inside-anki-editable/}
+         */
+        const callback = preventResubscription();
+
+        const svelteAnchor = new TooltipAnchor({
+            target: anchor.parentElement ?? editable,
+            anchor,
+            props: {
+                editable,
+                anchorContent: anchor.innerHTML,
+                tooltipContent: decodeAttribute(anchor.dataset.tippyContent!),
+            },
+        });
+
+        /**
+         * Svelte components can't directly self-destruct, so we listen
+         * for a message from TooltipAnchor to destroy it from outside.
+         */
+        svelteAnchor.$on("destroyComponent", () => {
+            svelteAnchor.$destroy();
+            setTimeout(() => {
+                // Reenable resubscription
+                callback();
+
+                // Restore caret position
+                const editedAnchor = editable.querySelector(
+                    "a[data-tippy-content].edited",
+                );
+                if (editedAnchor) {
+                    placeCaretAfter(editedAnchor);
+                    editedAnchor.removeAttribute("class");
+                } else if (previousSibling) {
+                    placeCaretAfter(previousSibling);
+                } else {
+                    editable.focus();
+                }
+            });
+        });
+
+        anchor.remove();
+    }
+});

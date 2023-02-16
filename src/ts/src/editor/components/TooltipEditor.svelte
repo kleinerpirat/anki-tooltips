@@ -17,7 +17,7 @@ A simple `<div contenteditable>` to edit the data-tippy-content attribute of Too
 
 <script lang="ts">
     import { acceptIcon, scrapIcon, recycleIcon } from "../assets/icons";
-    import { createEventDispatcher } from "svelte/internal";
+    import { createEventDispatcher, onMount } from "svelte/internal";
     import { TooltipState } from "./TooltipAnchor.svelte";
     import { moveCaretToEnd } from "../utils";
 
@@ -46,6 +46,15 @@ A simple `<div contenteditable>` to edit the data-tippy-content attribute of Too
 
     let height = 0;
     $: dispatch("height", { height });
+
+    /**
+     * Required on older Anki versions for some reason
+     */
+    onMount(() => {
+        setTimeout(() => {
+            dispatch("height", { height: 60 });
+        });
+    });
 </script>
 
 <div class="tippy-content" bind:clientHeight={height}>
