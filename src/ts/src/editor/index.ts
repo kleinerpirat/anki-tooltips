@@ -52,16 +52,16 @@ const addonPackage = addonPackageFromScript(
 );
 
 /**
- * Anki minor version exposed in qt/webview.py
+ * Anki minor version exposed by the add-on in qt/webview.py
  * On lower versions it might not be initialized at the time of this assignment.
  */
 const pointVersion: number | undefined = globalThis.pointVersion;
 const legacy = pointVersion == undefined || pointVersion <= 54;
 
 /**
- * Surrounding logic got reworked for 2.1.55, so this is either the
- * surrounder from RichTextInput (2.1.55+)
- * or a newly created Surrounder instance.
+ * The Surrounder class got reworked for 2.1.55, so this is either
+ * - the Surrounder of RichTextInput (2.1.55+)
+ * - or a newly created Surrounder instance (2.1.50 - 2.1.54)
  */
 const surrounder = legacy
     ? require("anki/surround").Surrounder.make()
@@ -84,25 +84,33 @@ NoteEditor.lifecycle.onMount(({ toolbar }: NoteEditorAPI): void => {
  * for all available API properties.
  */
 if (pointVersion && pointVersion >= 54) {
-    // richTextInput got exposed in 2.1.54
+    // richTextInput is available since 2.1.54
     require("anki/RichTextInput").lifecycle.onMount(setupRichTextInput);
 } else {
     /**
-     * Workaround for older Anki versions.
-     * Unfortunately the inputs are not yet mounted when
-     * NoteEditor.lifecycle.onMount fires, so we need that while loop.
+     * Workaround for older Anki versions. Since we want to attach styles and
+     * EventListeners to newly added fields (e.g. when the notetype changes),
+     * it's easiest to use a MutationObserver on the parent element of
+     * the fields (`<div class=".fields">`) and iterate over
+     * `NoteEditor.instances[0].fields` whenever an element is added/removed.
      */
     NoteEditor.lifecycle.onMount(async (noteEditor: NoteEditorAPI) => {
-        while (!noteEditor.fields?.length) {
-            await new Promise(requestAnimationFrame);
-        }
-        noteEditor.fields.forEach((field: EditorFieldAPI) => {
-            const inputs = get(field.editingArea.editingInputs) as [
-                RichTextInputAPI,
-                PlainTextInputAPI,
-            ];
-            setupRichTextInput(inputs[0]);
+        const observer = new MutationObserver(() => {
+            noteEditor.fields.forEach(async (field: EditorFieldAPI): Promise<void> => {
+                const inputs = get(field.editingArea.editingInputs) as [
+                    RichTextInputAPI,
+                    PlainTextInputAPI,
+                ];
+                const richText = inputs[0];
+                const editable = await richText.element;
+                if (editable.hasAttribute("tooltipsInitialized")) {
+                    return;
+                }
+                setupRichTextInput(richText);
+                editable.setAttribute("tooltipsInitialized", "");
+            });
         });
+        observer.observe(document.querySelector(".fields")!, {childList: true});
     });
 }
 
@@ -112,11 +120,12 @@ if (pointVersion && pointVersion >= 54) {
 async function setupRichTextInput(api: RichTextInputAPI) {
     const { customStyles, element, preventResubscription } = api;
 
+    // <anki-editable>
+    const editable = await element;
+
     if (legacy && !surrounder.richText) {
         surrounder.richText = api;
     }
-
-    const editable = await element;
 
     insertStyles(
         customStyles,

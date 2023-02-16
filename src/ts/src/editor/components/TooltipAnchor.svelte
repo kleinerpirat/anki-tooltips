@@ -17,7 +17,8 @@ which in turn hosts the TooltipEditor component.
 </script>
 
 <script lang="ts">
-    import tippy, { Instance } from "tippy.js";
+    import tippy from "tippy.js";
+    import type { Instance } from "tippy.js";
     import { createEventDispatcher, onDestroy } from "svelte/internal";
     import { bubbleSymbol } from "../lib";
     import { encodeAttribute, decodeAttribute } from "../utils";
