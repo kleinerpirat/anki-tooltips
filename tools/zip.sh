@@ -8,4 +8,4 @@ mkdir -p "$DIR/zipped"
 
 cd "$DIR/dist"
 
-zip -r "$DIR/zipped/tippy-tooltips.ankiaddon" *
+zip -r "$DIR/zipped/anki-tooltips.ankiaddon" *
