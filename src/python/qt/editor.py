@@ -7,6 +7,7 @@ import html
 from bs4 import BeautifulSoup
 import warnings
 
+from aqt import QShortcut, QKeySequence
 from aqt.editor import Editor
 from aqt.gui_hooks import editor_did_init, editor_will_munge_html
 from ..config import tooltip_shortcut
@@ -19,16 +20,17 @@ def suppress() -> None:
     pass
 
 
-def on_editor_did_init(editor: Editor) -> str:
+def on_editor_did_init(editor: Editor) -> None:
     """
     Override default editor shortcut
-    """
 
     QShortcut(  # type: ignore
         QKeySequence(tooltip_shortcut.value),
-        self.widget,
+        editor.widget,
         activated=suppress,
     )
+    """
+    return
 
 
 def on_editor_will_munge_html(txt: str, editor: Editor) -> str:
