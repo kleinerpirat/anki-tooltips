@@ -57,7 +57,7 @@ and its build scripts, which are based on [New Format Pack](https://github.com/h
 
 ## Building
 
-Navigate to `/tools` and make the bash scripts executable.
+Navigate to `tools/` and make the bash scripts executable.
 
 For development builds use:
 
@@ -65,10 +65,10 @@ For development builds use:
 tools/dev.sh
 ```
 
-Console logs are preserved in this mode and code is not minified. To see the effect of `/ts` changes,
-just reopen the webview. Changes to `/python` require a fresh build.
+Console logs are preserved in this mode and code is not minified. To see the effect of `ts/` changes,
+just reopen the webview. Changes to `python/` require a fresh build.
 
-Symlink the output folder `/dist` to `Anki2/addons21` to test the add-on in Anki.
+Symlink the output folder `dist/` to `Anki2/addons21/` to test the add-on in Anki.
 
 ---
 
