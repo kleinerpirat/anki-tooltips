@@ -7,20 +7,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 A button with shortcut that uses a Surrounder (class imported from "anki/surround")
 to wrap selected content with `<a>` tags and changes its state depending on the current selection.
 
-Components such as this one can be appended to the editor toolbar the following way:
-
-@example
-```js
-import TooltipButton from "./TooltipButton.svelte"
-
-require("anki/NoteEditor").lifecycle.onMount(({ toolbar }) => {
-    toolbar.templateButtons.append({
-        component: TooltipButton,
-        props: { keyCombination: "Control+T" }, // optional
-        id: "tooltipButton", // optional
-    });
-});
-```
+Components such as this one can be appended to the editor toolbar (@see index.ts)
 @see {@link https://github.com/ankitects/anki/tree/main/ts/sveltelib/dynamic-slotting.ts}
 -->
 <script lang="ts">
